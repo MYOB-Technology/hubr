@@ -48,6 +48,14 @@ const (
 )
 
 var (
+	// the default base and upload urls used for github enterprise
+	defaultBaseUrl   = ""
+	defaultUploadUrl = ""
+
+	// the actual base and upload urls used for client creation
+	actualBaseUrl   = ""
+	actualUploadUrl = ""
+
 	// the default org/owner if not supplied
 	defaultOrg = ""
 
@@ -63,6 +71,12 @@ var (
 )
 
 func init() {
+	if s, ok := os.LookupEnv("HUBR_BASE_URL"); ok {
+		defaultBaseUrl = s
+	}
+	if s, ok := os.LookupEnv("HUBR_UPLOAD_URL"); ok {
+		defaultUploadUrl = s
+	}
 	if org, ok := os.LookupEnv("HUBR_DEFAULT_ORG"); ok {
 		defaultOrg = org
 	}
@@ -114,6 +128,12 @@ func NewClient() (*client, error) {
 	}
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	tc := oauth2.NewClient(ctxbg, ts)
+
+	if actualBaseUrl != "" || actualUploadUrl != "" {
+		c, err := github.NewEnterpriseClient(actualBaseUrl, actualUploadUrl, tc)
+		return &client{Client: c}, err
+	}
+
 	return &client{Client: github.NewClient(tc)}, nil
 }
 
@@ -1271,6 +1291,8 @@ func main() {
 	}
 
 	v := flag.Bool("v", false, "print version on standard output and exit")
+	flag.StringVar(&actualBaseUrl, "b", defaultBaseUrl, "the github base url for enterprise clients")
+	flag.StringVar(&actualUploadUrl, "u", defaultUploadUrl, "the github upload url for enterprise clients")
 	flag.Parse()
 	if *v {
 		fmt.Println(hubr + "-" + runtime.GOOS + "-" + runtime.GOARCH)
@@ -2473,6 +2495,10 @@ var helpMain = `Usage: %s [opts] <cmd>
   A GitHub personal access token is required. The following chain of token
   sources was specified at build time:
   	` + defaultChain + `
+
+  For enterprise usage the github base and upload urls may be set using flags
+  described below, which will fall back on the environ keys HUBR_BASE_URL and
+  HUBR_UPLOAD_URL respectively.
 
   For more help, -h any subcommand.
 `
